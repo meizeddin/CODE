@@ -7,13 +7,13 @@ use crate::{kem, IdentityKey, IdentityKeyPair, KeyPair, PublicKey}; // Import ne
 
 /// Struct representing the parameters required for Alice in the Signal Protocol.
 pub struct AliceSignalProtocolParameters {
-    our_identity_key_pair: IdentityKeyPair, // Alice's identity key pair
-    our_base_key_pair: KeyPair, // Alice's base key pair
+    our_identity_key_pair: IdentityKeyPair, // Alice's identity key pair //swoosh
+    our_base_key_pair: KeyPair, // Alice's base key pair  //kyber IS this the ephemeral key pair??
 
-    their_identity_key: IdentityKey, // Bob's identity key
-    their_signed_pre_key: PublicKey, // Bob's signed pre-key
-    their_one_time_pre_key: Option<PublicKey>, // Bob's one-time pre-key, if available
-    their_ratchet_key: PublicKey, // Bob's ratchet key
+    their_identity_key: IdentityKey, // Bob's identity key //kyber
+    their_signed_pre_key: PublicKey, // Bob's signed pre-key //swoosh
+    their_one_time_pre_key: Option<PublicKey>, // Bob's one-time pre-key, if available //kyber
+    their_ratchet_key: PublicKey, // Bob's ratchet key //kyber
     their_kyber_pre_key: Option<kem::PublicKey>, // Bob's Kyber pre-key, if available
 }
 

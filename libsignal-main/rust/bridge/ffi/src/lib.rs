@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 
+// Allow missing safety documentation for functions
 #![allow(clippy::missing_safety_doc)]
+// Warn on use of unwrap, which can panic
 #![warn(clippy::unwrap_used)]
 
 use futures_util::FutureExt;
@@ -17,11 +19,13 @@ pub mod logging;
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_print_ptr(p: *const std::ffi::c_void) {
+    // Print a pointer's address in Rust
     println!("In rust that's {:?}", p);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_free_string(buf: *const c_char) {
+    // Free a C string
     if buf.is_null() {
         return;
     }
@@ -30,6 +34,7 @@ pub unsafe extern "C" fn signal_free_string(buf: *const c_char) {
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_free_buffer(buf: *const c_uchar, buf_len: usize) {
+    // Free a buffer of unsigned characters
     if buf.is_null() {
         return;
     }
@@ -41,6 +46,7 @@ pub unsafe extern "C" fn signal_free_buffer(buf: *const c_uchar, buf_len: usize)
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_free_list_of_strings(buffer: OwnedBufferOf<CStringPtr>) {
+    // Free a list of C strings
     let strings = buffer.into_box();
     for &s in &*strings {
         signal_free_string(s);
@@ -52,11 +58,13 @@ pub unsafe extern "C" fn signal_free_list_of_strings(buffer: OwnedBufferOf<CStri
 pub unsafe extern "C" fn signal_free_lookup_response_entry_list(
     buffer: OwnedBufferOf<crate::FfiCdsiLookupResponseEntry>,
 ) {
+    // Free a list of lookup response entries
     drop(buffer.into_box())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_free_bytestring_array(array: BytestringArray) {
+     // Free an array of byte strings
     drop(array.into_boxed_parts())
 }
 
@@ -65,6 +73,7 @@ pub unsafe extern "C" fn signal_error_get_message(
     err: *const SignalFfiError,
     out: *mut *const c_char,
 ) -> *mut SignalFfiError {
+    // Get the error message from a SignalFfiError
     let result = (|| {
         let err = err.as_ref().ok_or(NullPointerError)?;
         write_result_to(out, err.to_string())
@@ -81,6 +90,7 @@ pub unsafe extern "C" fn signal_error_get_address(
     err: *const SignalFfiError,
     out: *mut *mut ProtocolAddress,
 ) -> *mut SignalFfiError {
+    // Get the address from a SignalFfiError
     let err = AssertUnwindSafe(err);
     run_ffi_safe(|| {
         let err = err.as_ref().ok_or(NullPointerError)?;
@@ -96,6 +106,7 @@ pub unsafe extern "C" fn signal_error_get_uuid(
     err: *const SignalFfiError,
     out: *mut [u8; 16],
 ) -> *mut SignalFfiError {
+    // Get the UUID from a SignalFfiError
     let err = AssertUnwindSafe(err);
     run_ffi_safe(|| {
         let err = err.as_ref().ok_or(NullPointerError)?;
@@ -108,6 +119,7 @@ pub unsafe extern "C" fn signal_error_get_uuid(
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_error_get_type(err: *const SignalFfiError) -> u32 {
+    // Get the type code from a SignalFfiError
     match err.as_ref() {
         Some(err) => err.code() as u32,
         None => 0,
@@ -119,6 +131,7 @@ pub unsafe extern "C" fn signal_error_get_retry_after_seconds(
     err: *const SignalFfiError,
     out: *mut u32,
 ) -> *mut SignalFfiError {
+    // Get the retry-after-seconds value from a SignalFfiError
     let err = AssertUnwindSafe(err);
     run_ffi_safe(|| {
         let err = err.as_ref().ok_or(NullPointerError)?;
@@ -139,6 +152,7 @@ pub unsafe extern "C" fn signal_error_get_tries_remaining(
 ) -> *mut SignalFfiError {
     let err = AssertUnwindSafe(err);
     run_ffi_safe(|| {
+        // Get the number of tries remaining from a SignalFfiError
         let err = err.as_ref().ok_or(NullPointerError)?;
         let value = err.provide_tries_remaining().map_err(|_| {
             SignalProtocolError::InvalidArgument(format!(
@@ -152,6 +166,7 @@ pub unsafe extern "C" fn signal_error_get_tries_remaining(
 
 #[no_mangle]
 pub unsafe extern "C" fn signal_error_free(err: *mut SignalFfiError) {
+    // Free a SignalFfiError
     if !err.is_null() {
         let _boxed_err = Box::from_raw(err);
     }
@@ -163,6 +178,7 @@ pub unsafe extern "C" fn signal_identitykeypair_deserialize(
     public_key: *mut *mut PublicKey,
     input: BorrowedSliceOf<c_uchar>,
 ) -> *mut SignalFfiError {
+    // Deserialize an identity key pair
     run_ffi_safe(|| {
         let input = input.as_slice()?;
         let identity_key_pair = IdentityKeyPair::try_from(input)?;
@@ -189,6 +205,7 @@ pub unsafe extern "C" fn signal_sealed_session_cipher_decrypt(
     prekey_store: *const FfiPreKeyStoreStruct,
     signed_prekey_store: *const FfiSignedPreKeyStoreStruct,
 ) -> *mut SignalFfiError {
+    // Decrypt a sealed session cipher
     run_ffi_safe(|| {
         let mut kyber_pre_key_store = InMemKyberPreKeyStore::new();
         let ctext = ctext.as_slice()?;
