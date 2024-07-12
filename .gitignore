@@ -1,0 +1,24 @@
+# Binaries for programs and plugins
+*.exe
+*.so
+*.dylib
+*.dll
+
+# Test output
+*.out
+
+# Compilation artifacts
+/target/
+
+# Rust package manager lock file
+Cargo.lock
+
+# If you're using a specific IDE, add its specific ignore patterns
+# For example, for Visual Studio Code:
+/.vscode/
+
+# macOS specific ignores
+.DS_Store
+
+# Windows specific ignores
+Thumbs.db
