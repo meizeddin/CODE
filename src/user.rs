@@ -25,32 +25,6 @@ pub struct UserBundle {
     pub opks_p: Vec<PublicKey>
 }
 
-// Mock server to simulate key bundle retrieval
-pub struct MockServer;
-
-impl MockServer {
-    // Simulates getting a key bundle for a user
-    pub fn get_key_bundle(&self, user_name: &str) -> Option<KeyBundle> {
-        // Simulate retrieving a key bundle based on user_name
-        match user_name {
-            "Alice" => Some(KeyBundle {
-                ek_s: EphemeralSecret::random_from_rng(&mut OsRng),
-                ek_p: PublicKey::from(&EphemeralSecret::random_from_rng(&mut OsRng)),
-            }),
-            _ => None, // Return None for unknown user_names
-        }
-    }
-}
-// Key bundle structure to store keys for a user
-pub struct KeyBundle {
-    pub ek_s: EphemeralSecret,
-    pub ek_p: PublicKey,
-}
-
-
-// Example Server struct or trait definition
-
-
 // user implementation
 impl User{
     //A "new" function, a constructor for creating a new User instance It takes two parameters and returns a new user instance
@@ -99,8 +73,6 @@ impl User{
         }
     }
 
-    
-
 }
 
 fn main() {
@@ -108,5 +80,8 @@ fn main() {
 
     let bundle: UserBundle = user.publish();
 
-    println!("{:?}", bundle);    
+    println!("{:?}", bundle);
+    
+    println!("hello world");
+    
 }
