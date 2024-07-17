@@ -1,7 +1,14 @@
+extern crate rand;
+extern crate ed25519_dalek;
+extern crate hex;
+
 use rand::{Rng, rngs::OsRng};
-use x25519_dalek::{EphemeralSecret, PublicKey};
+use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
 use ed25519_dalek::{SigningKey, Signature, Signer};
 use std::collections::HashMap;
+use hkdf::Hkdf;
+use sha2::Sha256;
+//use p256::{EncodedPoint, PublicKey, ecdh::EphemeralSecret};
 
 // a user structure that holds the private and public keys, the signature, and other related fields.
 pub struct User{
@@ -26,30 +33,41 @@ pub struct UserBundle {
 }
 
 // Mock server to simulate key bundle retrieval
-pub struct MockServer;
-
+pub struct MockServer {
+    key_bundles: HashMap<String, UserBundle>
+}
 impl MockServer {
+    // Creates a new mock server with pre-populated key bundles
+    pub fn new() -> MockServer {
+        let mut key_bundles = HashMap::new();
+
+        let alice: User = User::new("Alice".to_string(), 3);
+        let bob: User = User::new("Bob".to_string(), 3);
+        
+        let bundle_b: UserBundle = bob.publish();
+        let bundle_a: UserBundle = alice.publish();
+
+
+        key_bundles.insert("Alice".to_string(), bundle_a);
+        key_bundles.insert("Bob".to_string(), bundle_b);
+
+
+        MockServer { key_bundles }
+    }
+
     // Simulates getting a key bundle for a user
-    pub fn get_key_bundle(&self, user_name: &str) -> Option<KeyBundle> {
-        // Simulate retrieving a key bundle based on user_name
-        match user_name {
-            "Alice" => Some(KeyBundle {
-                ek_s: EphemeralSecret::random_from_rng(&mut OsRng),
-                ek_p: PublicKey::from(&EphemeralSecret::random_from_rng(&mut OsRng)),
-            }),
-            _ => None, // Return None for unknown user_names
-        }
+    pub fn get_key_bundle(&self, user_name: &str) -> Option<&UserBundle> {
+        self.key_bundles.get(user_name)
     }
 }
-// Key bundle structure to store keys for a user
-pub struct KeyBundle {
-    pub ek_s: EphemeralSecret,
-    pub ek_p: PublicKey,
+
+// Implement HKDF using hkdf crate
+fn x3dh_kdf(key_material: &[u8]) -> [u8; 32] {
+    let hkdf = Hkdf::<Sha256>::new(None, key_material);
+    let mut output = [0u8; 32];
+    hkdf.expand(&[], &mut output).expect("HKDF expand error");
+    output
 }
-
-
-// Example Server struct or trait definition
-
 
 // user implementation
 impl User{
@@ -89,7 +107,7 @@ impl User{
             dr_keys: HashMap::new()
         }
     }
-
+    // Publish the public part of the user's key bundle
     pub fn publish(&self) -> UserBundle{
         UserBundle{
             ik_p: self.ik_p,
@@ -99,14 +117,109 @@ impl User{
         }
     }
 
+    // Retrieve and store the key bundle for a user from the server
+    pub fn get_key_bundle(&mut self, server: &MockServer, user_name: &str) -> bool {
+        if self.key_bundles.contains_key(user_name) && self.dr_keys.contains_key(user_name) {
+            println!("Already stored {} locally, no need for handshake again", user_name);
+            return false;
+        }
+
+        let key_bundle = server.get_key_bundle(user_name);
+        self.key_bundles.insert(user_name.to_string(), key_bundle);
+        true
+    }
     
 
+    // // Perform an initial handshake with another user
+    // pub fn initial_handshake(&mut self, server: &MockServer, user_name: &str) {
+    //     if self.get_key_bundle(server, user_name) {
+    //         let mut csprng: OsRng = OsRng;
+    //         let sk: EphemeralSecret = EphemeralSecret::random_from_rng(&mut csprng);
+    //         let key_bundle = self.key_bundles.get_mut(user_name).unwrap();
+    //         key_bundle.ek_p = PublicKey::from(&sk);
+    //     }
+    // }
+
+    // Function to generate send secret key based on DH exchanges and signature verification
+    // pub fn generate_send_secret_key(&mut self, user_name: &str) {
+    //     if let Some(key_bundle) = self.key_bundles.get_mut(user_name) {
+    //         let dh_1 = self.ik_s.diffie_hellman(&key_bundle.spk_p);
+    //         let dh_2 = key_bundle.ek_s.diffie_hellman(&self.ik_p);
+    //         let dh_3 = key_bundle.ek_s.diffie_hellman(&self.spk_p);
+    //         let dh_4 = key_bundle.ek_s.diffie_hellman(&self.opks_p[0]); // Assuming OPK_p is a Vec and we take the first one
+
+    //         // Verify the signed prekey
+    //         let public_key_bytes = key_bundle.spk_p.to_bytes();
+    //         let signature_bytes = key_bundle.spk_sig.to_bytes();
+    //         if !self.verify_signature(&public_key_bytes, &signature_bytes) {
+    //             println!("Unable to verify Signed Prekey");
+    //             return;
+    //         }
+
+    //         // Concatenate DH results and derive the send secret key
+    //         let key_material = [
+    //             dh_1.as_bytes(),
+    //             dh_2.as_bytes(),
+    //             dh_3.as_bytes(),
+    //             dh_4.as_bytes(),
+    //         ]
+    //         .concat();
+
+    //         key_bundle.sk = x3dh_kdf(&key_material);
+    //     }
+    // }
+    // Verify Ed25519 signature
+    // fn verify_signature(&self, public_key_bytes: &[u8], signature_bytes: &[u8]) -> bool {
+    //     let public_key = ed25519_dalek::PublicKey::from_bytes(public_key_bytes);
+    //     let signature = Signature::from_bytes(signature_bytes);
+
+    //     if let (Ok(public_key), Ok(signature)) = (public_key, signature) {
+    //         public_key.verify_strict(&self.spk_p.as_bytes(), &signature).is_ok()
+    //     } else {
+    //         false
+    //     }
+    // }
 }
 
+// Test the mock server interaction
+// fn test_mock_server() {
+//     // Create a user
+//     let mut user: User = User::new("Alice".to_string(), 1);
+
+//     // Create a mock server
+//     let server = MockServer::new();
+
+//     // Simulate initial handshake with another user
+//     user.initial_handshake(&server, "Alice");
+
+//     // Print out the key bundle for the user
+//     let bundle: UserBundle = user.publish();
+//     println!("{:?}", bundle);
+// }
+
 fn main() {
-    let user: User = User::new("Alice".to_string(), 1);
+    let alice: User = User::new("Alice".to_string(), 3);
+    let bob: User = User::new("Bob".to_string(), 3);
 
-    let bundle: UserBundle = user.publish();
 
-    println!("{:?}", bundle);    
+    let bundle_a: UserBundle = alice.publish();
+    let bundle_b: UserBundle = bob.publish();
+
+    // Alice and Bob exchange public keys and compute the shared secret
+    let alice_shared_secret: SharedSecret = alice.ik_s.diffie_hellman(&bundle_b.ik_p);
+    let bob_shared_secret: SharedSecret = bob.ik_s.diffie_hellman(&bundle_a.ik_p);
+
+
+    // Assert and print the result of the assertion
+    if alice_shared_secret.as_bytes() == bob_shared_secret.as_bytes() {
+        println!("The shared secrets are equal.");
+    } else {
+        println!("The shared secrets are not equal.");
+    }
+
+    println!("{:?}\n", bundle_a);  
+    println!("{:?}\n", bundle_b);    
+  
+
+    //test_mock_server();
 }
