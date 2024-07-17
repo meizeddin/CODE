@@ -3,34 +3,39 @@ extern crate ed25519_dalek;
 extern crate hex;
 
 use rand::{Rng, rngs::OsRng};
-use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
+use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
 use ed25519_dalek::{SigningKey, Signature, Signer};
 use std::collections::HashMap;
+use std::str;
 use hkdf::Hkdf;
 use sha2::Sha256;
+use serde::{Serialize, Deserialize};
+
 //use p256::{EncodedPoint, PublicKey, ecdh::EphemeralSecret};
 
 // a user structure that holds the private and public keys, the signature, and other related fields.
 pub struct User{
     pub name: String,
     pub ik_s: EphemeralSecret, //private_identity_key
-    pub ik_p: PublicKey, //public_identity_key
+    pub ik_p: X25519PublicKey, //public_identity_key
     pub spk_s: EphemeralSecret, //private_signed_pre_key
-    pub spk_p: PublicKey, //public_signed_pre_key
+    pub spk_p: X25519PublicKey, //public_signed_pre_key
     pub spk_sig: Signature, //signed_pre_key_signature
-    pub opks_s: Vec<(EphemeralSecret, PublicKey)>, //one-time pre keys (public and private) 
-    pub opks_p: Vec<PublicKey>, //one-time pre keys (public only "published")
+    pub opks_s: Vec<(EphemeralSecret, X25519PublicKey)>, //one-time pre keys (public and private) 
+    pub opks_p: Vec<X25519PublicKey>, //one-time pre keys (public only "published")
     pub key_bundles: HashMap<String, Vec<u8>>, //for serialised key bundles (public keys)
     pub dr_keys: HashMap<String, Vec<u8>> //for derived keys used to encrypt or decrypt messages
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserBundle {
-    pub ik_p: PublicKey,
-    pub spk_p: PublicKey,
+    pub ik_p: X25519PublicKey,
+    pub spk_p: X25519PublicKey,
     pub spk_sig: Signature,
-    pub opks_p: Vec<PublicKey>
+    pub opks_p: Vec<X25519PublicKey>
 }
+
+
 
 // Mock server to simulate key bundle retrieval
 pub struct MockServer {
