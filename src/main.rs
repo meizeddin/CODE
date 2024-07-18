@@ -3,7 +3,7 @@ extern crate ed25519_dalek;
 extern crate hex;
 
 use rand::{Rng, rngs::OsRng};
-use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
+use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
 use ed25519_dalek::{SigningKey, Signature, Signer};
 use std::collections::HashMap;
 use std::str;
@@ -17,54 +17,24 @@ use serde::{Serialize, Deserialize};
 pub struct User{
     pub name: String,
     pub ik_s: EphemeralSecret, //private_identity_key
-    pub ik_p: X25519PublicKey, //public_identity_key
+    pub ik_p: PublicKey, //public_identity_key
     pub spk_s: EphemeralSecret, //private_signed_pre_key
-    pub spk_p: X25519PublicKey, //public_signed_pre_key
+    pub spk_p: PublicKey, //public_signed_pre_key
     pub spk_sig: Signature, //signed_pre_key_signature
-    pub opks_s: Vec<(EphemeralSecret, X25519PublicKey)>, //one-time pre keys (public and private) 
-    pub opks_p: Vec<X25519PublicKey>, //one-time pre keys (public only "published")
+    pub opks_s: Vec<(EphemeralSecret, PublicKey)>, //one-time pre keys (public and private) 
+    pub opks_p: Vec<PublicKey>, //one-time pre keys (public only "published")
     pub key_bundles: HashMap<String, Vec<u8>>, //for serialised key bundles (public keys)
     pub dr_keys: HashMap<String, Vec<u8>> //for derived keys used to encrypt or decrypt messages
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct UserBundle {
-    pub ik_p: X25519PublicKey,
-    pub spk_p: X25519PublicKey,
+    pub ik_p: PublicKey,
+    pub spk_p: PublicKey,
     pub spk_sig: Signature,
-    pub opks_p: Vec<X25519PublicKey>
+    pub opks_p: Vec<PublicKey>
 }
 
-
-
-// Mock server to simulate key bundle retrieval
-pub struct MockServer {
-    key_bundles: HashMap<String, UserBundle>
-}
-impl MockServer {
-    // Creates a new mock server with pre-populated key bundles
-    pub fn new() -> MockServer {
-        let mut key_bundles = HashMap::new();
-
-        let alice: User = User::new("Alice".to_string(), 3);
-        let bob: User = User::new("Bob".to_string(), 3);
-        
-        let bundle_b: UserBundle = bob.publish();
-        let bundle_a: UserBundle = alice.publish();
-
-
-        key_bundles.insert("Alice".to_string(), bundle_a);
-        key_bundles.insert("Bob".to_string(), bundle_b);
-
-
-        MockServer { key_bundles }
-    }
-
-    // Simulates getting a key bundle for a user
-    pub fn get_key_bundle(&self, user_name: &str) -> Option<&UserBundle> {
-        self.key_bundles.get(user_name)
-    }
-}
 
 // Implement HKDF using hkdf crate
 fn x3dh_kdf(key_material: &[u8]) -> [u8; 32] {
@@ -117,33 +87,19 @@ impl User{
         UserBundle{
             ik_p: self.ik_p,
             spk_p: self.spk_p,
-            spk_sig: self.spk_sig,
-            opks_p: self.opks_p.clone()
+            spk_sig: self.spk_sig.clone(),
+            opks_p: self.opks_p.clone(),
         }
-    }
-
-    // Retrieve and store the key bundle for a user from the server
-    pub fn get_key_bundle(&mut self, server: &MockServer, user_name: &str) -> bool {
-        if self.key_bundles.contains_key(user_name) && self.dr_keys.contains_key(user_name) {
-            println!("Already stored {} locally, no need for handshake again", user_name);
-            return false;
-        }
-
-        let key_bundle = server.get_key_bundle(user_name);
-        self.key_bundles.insert(user_name.to_string(), key_bundle);
-        true
     }
     
 
-    // // Perform an initial handshake with another user
-    // pub fn initial_handshake(&mut self, server: &MockServer, user_name: &str) {
-    //     if self.get_key_bundle(server, user_name) {
-    //         let mut csprng: OsRng = OsRng;
-    //         let sk: EphemeralSecret = EphemeralSecret::random_from_rng(&mut csprng);
-    //         let key_bundle = self.key_bundles.get_mut(user_name).unwrap();
-    //         key_bundle.ek_p = PublicKey::from(&sk);
-    //     }
-    // }
+    // Perform an initial handshake with another user
+    pub fn initial_handshake(&mut self, user_name: &str) {
+        let mut csprng: OsRng = OsRng;
+        let sk: EphemeralSecret = EphemeralSecret::random_from_rng(&mut csprng);
+        let key_bundle = self.key_bundles.get_mut(user_name).unwrap();
+        key_bundle.ek_p = PublicKey::from(&sk);
+    }
 
     // Function to generate send secret key based on DH exchanges and signature verification
     // pub fn generate_send_secret_key(&mut self, user_name: &str) {
